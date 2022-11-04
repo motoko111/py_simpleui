@@ -1,5 +1,5 @@
 from this import d
-import simpleui as UI
+import py_simpleui as UI
 import PySimpleGUI as sg
 
 ui = UI.SimpleUI()
