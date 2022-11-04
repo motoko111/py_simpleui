@@ -1,2 +1,3 @@
 # py_simpleui
-simpleなUIを構築するモジュール
+簡易的にUIを構築するための処理
+by PySimpleGUI
