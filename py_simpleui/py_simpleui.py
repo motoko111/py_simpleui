@@ -27,6 +27,31 @@ class SimpleUICustom(SimpleUIItem):
     def handler(self,args):
         return self.func(args)
 # =================================================
+class SimpleUIPanel(SimpleUIItem):
+    def __init__(self, label):
+        self.label = label
+        self.func = None
+        self.items = []
+        pass
+    def layout(self):
+        ret = []
+        for item in self.items:
+            for i in item.layout():
+                ret.append(i)
+        return ret
+    def update(self,event,values):
+        for item in self.items:
+            if item.label == event:
+                item.handler(values)
+    def add(self,item):
+        self.items.append(item)
+    def remove(self,key):
+        for item in self.items:
+            if item.label == key:
+                self.items.remove(item)
+    def clear(self):
+        self.items.clear()
+# =================================================
 class SimpleUIButton(SimpleUIItem):
     def __init__(self, label, onclick):
         self.label = label
@@ -74,6 +99,19 @@ class SimpleUIList(SimpleUIItem):
         return [sg.Listbox(values=self.items, size=(20, 20), key=self.label, enable_events=True)]
     def handler(self,args):
         self.value = args[self.label][0]
+        self.func(self.value)
+# =================================================
+class SimpleUIDropDown(SimpleUIItem):
+    def __init__(self, label, items, default_value, onselect):
+        self.label = label
+        self.func = onselect
+        self.items = items
+        self.default_value = default_value
+        self.value = self.default_value
+    def layout(self):
+        return [sg.Combo(values=self.items, default_value=self.default_value ,size=(20, 20), key=self.label, enable_events=True)]
+    def handler(self,args):
+        self.value = args[self.label]
         self.func(self.value)
 # =================================================
 class SimpleUIInputField(SimpleUIItem):
@@ -134,7 +172,7 @@ class SimpleUIWindow:
             layout.append(v.layout())
 
          # ウィンドウの生成
-        self.window = sg.Window(self.title, layout)
+        self.window = sg.Window(self.title, layout, finalize=True)
         self.isOpen = True
 
     def OnOpen(self):
@@ -162,14 +200,14 @@ class SimpleUIWindow:
         '''
         終了まで処理を続ける
         '''
-        while self.Update():
+        event, values = self.window.read()
+        while self.Update(event, values):
             pass
 
-    def Update(self):
+    def Update(self, event, values):
         '''
         @return True:継続 False:終了
         '''
-        event, values = self.window.read()
         if event is None:
             print('Exit Window:' + str(self.title))
             self.Close()
@@ -183,7 +221,7 @@ class SimpleUIWindow:
         指定ウィンドウを開くボタンを追加
         '''
         func = lambda : self.mger.OpenWindow(windowKey)
-        self.AddButton(label, func)
+        self.AddItem(SimpleUIButton(label, func))
 
 
     def CloseWindow(self, windowKey):
@@ -191,44 +229,6 @@ class SimpleUIWindow:
         指定ウィンドウを閉じる
         '''
         self.mger.CloseWindow(windowKey)
-
-    def AddButton(self, label, onclick):
-        '''
-        ボタン作成
-        @param label 名前
-        @param default_value デフォルトの値
-        @param onclick ボタン押したときの処理
-        '''
-        self.items[label] = SimpleUIButton(label, onclick)
-
-    def AddInputField(self, label, default_value, onchange_value):
-        '''
-        テキスト入力作成
-        @param label 名前
-        @param default_value デフォルトの値
-        @param onchange_value 値が変わった時の処理
-        '''
-        self.items[label] = SimpleUIInputField(label, default_value, onchange_value)
-
-    def AddToggle(self, label, default_value, onchange_value):
-        '''
-        トグル作成
-        @param label 名前
-        @param default_value デフォルトの値
-        @param onchange_value 値が変わった時の処理
-        '''
-        self.items[label] = SimpleUIToggle(label, default_value, onchange_value)
-
-    def AddSlider(self, label, default_value, min, max, onchange_value):
-        '''
-        スライダー作成
-        @param label 名前
-        @param default_value デフォルトの値
-        @param min 最小
-        @param max 最大
-        @param onchange_value 値が変わった時の処理
-        '''
-        self.items[label] = SimpleUISlider(label, default_value, min, max, onchange_value)
 
     def AddItem(self, item):
         '''
@@ -296,14 +296,16 @@ class SimpleUI:
         すべてのウィンドウの更新処理
         '''
         isRetry = False
+        window_instance, event, values = sg.read_all_windows()
+        for window in self.windows.values():
+            if window_instance == window.window:
+                window.Update(event, values)
         for window in self.windows.values():
             if window.IsOpen():
-                if window.Update():
-                    isRetry = True
+                isRetry = True
             elif window.title == self.topWindowKey:
                 self.AllCloseWindow()
                 isRetry = False
-        print("update")
         return isRetry
 
     def RemoveWindow(self, key):
@@ -325,7 +327,11 @@ class SimpleUI:
         ウィンドウを開く
         '''
         self.GetWindow(key).Open()
-
+        if key != self.topWindowKey:
+            print(key)
+            print(self.topWindowKey)
+            self.GetWindow(key).window.move(self.GetWindow(self.topWindowKey).window.current_location()[0], self.GetWindow(self.topWindowKey).window.current_location()[1]+220)
+        
     def CloseWindow(self, key):
         '''
         ウィンドウを閉じる
